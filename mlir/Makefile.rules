@@ -7,6 +7,7 @@ SNITCH_RUNTIME_SRC ?= /src/sw/snRuntime
 SNITCH_RUNTIME_LIB ?= /src/sw/snRuntime/build/libsnRuntime-cluster.a
 
 # Toolchain
+# NOTE: we are using the absolute path from the Docker container
 SNITCH_CC ?= /tools/riscv-llvm/bin/riscv32-unknown-elf-clang
 SNITCH_LD ?= /tools/riscv-llvm/bin/riscv32-unknown-elf-clang
 
@@ -116,6 +117,7 @@ CC1FLAGS += -O3
 CC1FLAGS += -mllvm -enable-misched=false
 
 # Make sure we are finding the right linker script
+# even if we are included in another Makefile
 pwd := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 LDSCRIPT := $(pwd)/cluster.ld
 
