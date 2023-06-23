@@ -69,8 +69,8 @@ extern "C" void memrefCopy(int64_t elemSize, UnrankedMemRefType<char> *srcArg,
   DynamicMemRefType<char> src(*srcArg);
   DynamicMemRefType<char> dst(*dstArg);
 
-  int64_t rank = src.rank;
-  // MLIR_MSAN_MEMORY_IS_INITIALIZED(src.sizes, rank * sizeof(int64_t));
+  int32_t rank = src.rank;
+  // MLIR_MSAN_MEMORY_IS_INITIALIZED(src.sizes, rank * sizeof(int32_t));
 
   // Handle empty shapes -> nothing to copy.
   for (int rankp = 0; rankp < rank; ++rankp)
@@ -85,26 +85,26 @@ extern "C" void memrefCopy(int64_t elemSize, UnrankedMemRefType<char> *srcArg,
     return;
   }
 
-  int64_t *indices =
-      static_cast<int64_t *>(::snrt_alloca(sizeof(int64_t) * rank));
-  int64_t *srcStrides =
-      static_cast<int64_t *>(::snrt_alloca(sizeof(int64_t) * rank));
-  int64_t *dstStrides =
-      static_cast<int64_t *>(::snrt_alloca(sizeof(int64_t) * rank));
+  int32_t *indices =
+      static_cast<int32_t *>(::snrt_l1alloc(sizeof(int32_t) * rank));
+  int32_t *srcStrides =
+      static_cast<int32_t *>(::snrt_l1alloc(sizeof(int32_t) * rank));
+  int32_t *dstStrides =
+      static_cast<int32_t *>(::snrt_l1alloc(sizeof(int32_t) * rank));
 
   // Initialize index and scale strides.
   for (int rankp = 0; rankp < rank; ++rankp) {
     indices[rankp] = 0;
-    srcStrides[rankp] = src.strides[rankp] * elemSize;
-    dstStrides[rankp] = dst.strides[rankp] * elemSize;
+    srcStrides[rankp] = /* src.strides[rankp] */ 1 * elemSize;
+    dstStrides[rankp] = /* dst.strides[rankp] */ 1 * elemSize;
   }
 
-  int64_t readIndex = 0, writeIndex = 0;
+  int32_t readIndex = 0, writeIndex = 0;
   for (;;) {
     // Copy over the element, byte by byte.
     ::snrt_memcpy(dstPtr + writeIndex, srcPtr + readIndex, elemSize);
     // Advance index and read position.
-    for (int64_t axis = rank - 1; axis >= 0; --axis) {
+    for (int32_t axis = rank - 1; axis >= 0; --axis) {
       // Advance at current axis.
       auto newIndex = ++indices[axis];
       readIndex += srcStrides[axis];

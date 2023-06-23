@@ -34,4 +34,4 @@ link_libraries(snMLIR)
 add_snitch_test(print tests/print.cpp)
 add_snitch_test(memref_to_llvm tests/memref_to_llvm.cpp)
 add_snitch_test(allocators tests/allocators.cpp)
-# add_snitch_test(memref_copy tests/memref_copy.cpp) # FIXME
+add_snitch_test(memref_copy tests/memref_copy.cpp) # FIXME
