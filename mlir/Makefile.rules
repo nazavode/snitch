@@ -1,15 +1,14 @@
 # Snitch runtime
 # NOTE: adjust SNITCH_RUNTIME_* paths, 
 # e.g. according to the Docker volume mount point
-SNITCH_RUNTIME_SRC ?= /src/sw/snRuntime
-# FIXME snRuntime cmake lacks install targets,
-#       in the meantime just point this at the build dir 
-SNITCH_RUNTIME_LIB ?= /src/sw/snRuntime/build/libsnRuntime-cluster.a
+SNITCH_RUNTIME_ROOT ?= /src/sw/snRuntime
 
 # Toolchain
 # NOTE: we are using the absolute path from the Docker container
-SNITCH_CC ?= /tools/riscv-llvm/bin/riscv32-unknown-elf-clang
-SNITCH_LD ?= /tools/riscv-llvm/bin/riscv32-unknown-elf-clang
+SNITCH_CC     ?= /tools/riscv-llvm/bin/riscv32-unknown-elf-clang
+SNITCH_LD     ?= /tools/riscv-llvm/bin/riscv32-unknown-elf-clang
+SNITCH_AR     ?= /tools/riscv-llvm/bin/llvm-ar
+SNITCH_RANLIB ?= /tools/riscv-llvm/bin/llvm-ranlib
 
 CFLAGS =
 # Mixing .c and .ll files makes some flags, useful for the former,
@@ -18,9 +17,9 @@ CFLAGS += -Wno-unused-command-line-argument
 # Flags for -x c
 CFLAGS += -D __LINK_LLD
 CFLAGS += -D __TOOLCHAIN_LLVM__
-CFLAGS += -I $(SNITCH_RUNTIME_SRC)/include
-CFLAGS += -I $(SNITCH_RUNTIME_SRC)/vendor
-CFLAGS += -I $(SNITCH_RUNTIME_SRC)/vendor/riscv-opcodes
+CFLAGS += -I $(SNITCH_RUNTIME_ROOT)/include
+CFLAGS += -I $(SNITCH_RUNTIME_ROOT)/vendor
+CFLAGS += -I $(SNITCH_RUNTIME_ROOT)/vendor/riscv-opcodes
 # Common flags
 CFLAGS += -flto=thin
 CFLAGS += -mcpu=snitch
@@ -102,9 +101,9 @@ CC1FLAGS += -dwarf-version=4
 CC1FLAGS += -debugger-tuning=gdb
 CC1FLAGS += -D __LINK_LLD
 CC1FLAGS += -D __TOOLCHAIN_LLVM__
-CC1FLAGS += -I /root/src/sw/snRuntime/include
-CC1FLAGS += -I /root/src/sw/snRuntime/vendor
-CC1FLAGS += -I /root/src/sw/snRuntime/vendor/riscv-opcodes
+CC1FLAGS += -I $(SNITCH_RUNTIME_ROOT)/include
+CC1FLAGS += -I $(SNITCH_RUNTIME_ROOT)/vendor
+CC1FLAGS += -I $(SNITCH_RUNTIME_ROOT)/vendor/riscv-opcodes
 CC1FLAGS += -resource-dir /tools/riscv-llvm/lib/clang/12.0.1
 CC1FLAGS += -internal-isystem /tools/riscv-llvm/riscv32-unknown-elf/include
 CC1FLAGS += -fno-builtin-printf
@@ -132,9 +131,44 @@ LDFLAGS += -Wl,-z,norelro
 LDFLAGS += -Wl,--gc-sections
 LDFLAGS += -Wl,--no-relax
 LDFLAGS += -T $(LDSCRIPT)
-LDFLAGS += $(SNITCH_RUNTIME_LIB)
 LDFLAGS += -lm
 
-.SECONDEXPANSION:
-%.o: $$(wildcard $$*.c) $$(wildcard $$*.ll)
+%.o: %.c
 	$(SNITCH_CC) $(CFLAGS) -c $< -o $@
+
+%.o: %.ll
+	$(SNITCH_CC) $(CFLAGS) -c $< -o $@
+
+%.o: %.S
+	$(SNITCH_CC) $(CFLAGS) -c $< -o $@
+
+#
+# Snitch runtime
+#
+
+# Runtime library will be built in $PWD
+SNITCH_RUNTIME_LIB = libsnRuntime.a
+
+SNITCH_RUNTIME_SOURCES +=
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/barrier.c
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/dma.c
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/memcpy.c
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/printf.c
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/team.c
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/ssr.c
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/alloc.c
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/interrupt.c
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/perf_cnt.c
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/ssr_v2.c
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/platforms/rtl/start_snitch.S
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/platforms/rtl/putchar.c
+SNITCH_RUNTIME_SOURCES += $(SNITCH_RUNTIME_ROOT)/src/platforms/shared/start.c
+
+SNITCH_RUNTIME_OBJS=$(patsubst %.c,%.o,$(patsubst %.S,%.o,$(SNITCH_RUNTIME_SOURCES)))
+
+$(SNITCH_RUNTIME_LIB): $(SNITCH_RUNTIME_OBJS)
+	$(SNITCH_AR) cr $(SNITCH_RUNTIME_LIB) $(SNITCH_RUNTIME_OBJS)
+	$(SNITCH_RANLIB) $(SNITCH_RUNTIME_LIB)
+
+clean-snitch-runtime:
+	rm -f $(SNITCH_RUNTIME_LIB) $(SNITCH_RUNTIME_OBJS)
